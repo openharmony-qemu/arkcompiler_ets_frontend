@@ -26,16 +26,23 @@ def copy_files(source_path, dest_path, is_file=False):
             shutil.copy(source_path, dest_path)
         else:
             shutil.copytree(source_path, dest_path, dirs_exist_ok=True,
-                symlinks=True)
+                symlinks=False)
     except Exception as err:
         raise Exception("Copy files failed. Error: " + str(err)) from err
 
 
 def run_cmd(cmd, execution_path=None):
+    env = os.environ.copy()
+    node18_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../prebuilts/build-tools/common/nodejs/node-v18.20.1-linux-x64/bin"))
+    if os.path.isdir(node18_root):
+        env["PATH"] = node18_root + ":" + env.get("PATH", "")
+        if cmd and os.path.basename(cmd[0]) == "npm":
+            cmd = [os.path.join(node18_root, "npm")] + list(cmd[1:])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                            stdin=subprocess.PIPE,
                            stderr=subprocess.PIPE,
-                           cwd=execution_path)
+                           cwd=execution_path,
+                           env=env)
     stdout, stderr = proc.communicate(timeout=300)
     if proc.returncode != 0:
         raise Exception(stderr.decode())

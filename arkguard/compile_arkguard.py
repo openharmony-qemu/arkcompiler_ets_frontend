@@ -35,7 +35,7 @@ def extract(package_path, dest_path, package_name):
 def copy_dir(source_path, dest_path):
     try:
         run_cmd(['rm', '-rf', dest_path])
-        shutil.copytree(source_path, dest_path, dirs_exist_ok=True, symlinks=True)
+        shutil.copytree(source_path, dest_path, dirs_exist_ok=True, symlinks=False)
     except Exception as err:
         raise Exception(err.decode())
 

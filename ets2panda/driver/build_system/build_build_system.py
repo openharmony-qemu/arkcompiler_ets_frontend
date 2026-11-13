@@ -26,13 +26,34 @@ def copy_files(source_path, dest_path, is_file=False):
         if is_file:
             shutil.copy(source_path, dest_path)
         else:
-            shutil.copytree(source_path, dest_path, dirs_exist_ok=True,
-                            symlinks=True)
+            shutil.copytree(source_path, dest_path, dirs_exist_ok=True, symlinks=False)
+            # Restore symlinks without copying unsupported VirtioFS metadata.
+            for source_dir, dirnames, filenames in os.walk(
+                    source_path, topdown=False):
+                for name in dirnames + filenames:
+                    source_entry = os.path.join(source_dir, name)
+                    if not os.path.islink(source_entry):
+                        continue
+                    relative_entry = os.path.relpath(source_entry, source_path)
+                    dest_entry = os.path.join(dest_path, relative_entry)
+                    if os.path.lexists(dest_entry):
+                        if os.path.isdir(dest_entry) and not os.path.islink(
+                                dest_entry):
+                            shutil.rmtree(dest_entry)
+                        else:
+                            os.unlink(dest_entry)
+                    os.symlink(os.readlink(source_entry), dest_entry)
     except Exception as err:
         raise Exception("Copy files failed. Error: " + str(err)) from err
 
 
 def run_cmd(cmd, execution_path=None):
+    env = os.environ.copy()
+    node18_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../prebuilts/build-tools/common/nodejs/node-v18.20.1-linux-x64/bin"))
+    if os.path.isdir(node18_root):
+        env["PATH"] = node18_root + ":" + env.get("PATH", "")
+        if cmd and os.path.basename(cmd[0]) == "npm":
+            cmd = [os.path.join(node18_root, "npm")] + list(cmd[1:])
     attempt = 0
     while attempt < 3:
         proc = subprocess.Popen(
@@ -40,7 +61,8 @@ def run_cmd(cmd, execution_path=None):
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=execution_path
+            cwd=execution_path,
+            env=env
         )
         stdout, stderr = proc.communicate(timeout=300)
         if proc.returncode == 0:
